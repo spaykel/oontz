@@ -1,125 +1,313 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(ClubBusyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
+class ClubBusyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Club Busy Status',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: ClubListScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class ClubListScreen extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _ClubListScreenState createState() => _ClubListScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _ClubListScreenState extends State<ClubListScreen> {
+  String _selectedSortOption = 'Alphabetical';
+  String _selectedCity = '';
+  List<String> _cities = [];
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _fetchCities();
+  }
+
+  void _fetchCities() async {
+    final querySnapshot = await FirebaseFirestore.instance.collection('clubs').get();
+    final cities = querySnapshot.docs.map((doc) => doc['city'] as String).toSet().toList();
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _cities = cities;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text('Clubs Busy Status'),
+        actions: [
+          DropdownButton<String>(
+            value: _selectedSortOption,
+            icon: Icon(Icons.sort),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedSortOption = newValue!;
+              });
+            },
+            items: <String>['Alphabetical', 'Busy Status']
+                .map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: DropdownButtonFormField<String>(
+              decoration: InputDecoration(
+                labelText: 'Select City',
+                border: OutlineInputBorder(),
+              ),
+              value: _selectedCity.isEmpty ? null : _selectedCity,
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedCity = newValue!;
+                });
+              },
+              items: _cities.map<DropdownMenuItem<String>>((String city) {
+                return DropdownMenuItem<String>(
+                  value: city,
+                  child: Text(city),
+                );
+              }).toList(),
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          Expanded(
+            child: ClubList(
+              sortOption: _selectedSortOption,
+              selectedCity: _selectedCity,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+        onPressed: () => _showAddClubDialog(context),
+        child: Icon(Icons.add),
+      ),
     );
+  }
+
+  void _showAddClubDialog(BuildContext context) {
+    final _nameController = TextEditingController();
+    final _statusController = TextEditingController();
+    final _cityController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Add New Club'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(labelText: 'Club Name'),
+              ),
+              TextField(
+                controller: _statusController,
+                decoration: InputDecoration(labelText: 'Busy Status (1-10)'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _cityController,
+                decoration: InputDecoration(labelText: 'City'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final name = _nameController.text;
+                final status = int.tryParse(_statusController.text);
+                final city = _cityController.text;
+
+                if (name.isNotEmpty && status != null && status >= 1 && status <= 10 && city.isNotEmpty) {
+                  final querySnapshot = await FirebaseFirestore.instance
+                      .collection('clubs')
+                      .where('name', isEqualTo: name)
+                      .get();
+
+                  if (querySnapshot.docs.isNotEmpty) {
+                    // If club exists, update the status
+                    final docId = querySnapshot.docs.first.id;
+                    FirebaseFirestore.instance.collection('clubs').doc(docId).update({
+                      'busyStatus': status,
+                      'city': city,
+                    });
+                  } else {
+                    // If club doesn't exist, add a new club
+                    FirebaseFirestore.instance.collection('clubs').add({
+                      'name': name,
+                      'busyStatus': status,
+                      'city': city,
+                    });
+                  }
+
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class Club {
+  final String name;
+  final int busyStatus;
+  final String city;
+
+  Club({required this.name, required this.busyStatus, required this.city});
+
+  factory Club.fromDocument(DocumentSnapshot doc) {
+    return Club(
+      name: doc['name'],
+      busyStatus: doc['busyStatus'],
+      city: doc['city'],
+    );
+  }
+}
+
+class ClubList extends StatelessWidget {
+  final String sortOption;
+  final String selectedCity;
+
+  ClubList({required this.sortOption, required this.selectedCity});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('clubs').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        var clubs = snapshot.data!.docs
+            .map((doc) => Club.fromDocument(doc))
+            .where((club) => club.city.toLowerCase().contains(selectedCity.toLowerCase()))
+            .toList();
+
+        if (sortOption == 'Alphabetical') {
+          clubs.sort((a, b) => a.name.compareTo(b.name));
+        } else if (sortOption == 'Busy Status') {
+          clubs.sort((a, b) => b.busyStatus.compareTo(a.busyStatus));
+        }
+
+        return ListView.builder(
+          itemCount: clubs.length,
+          itemBuilder: (context, index) {
+            final club = clubs[index];
+            return ListTile(
+              title: Text(
+                club.name,
+                style: TextStyle(fontSize: 20.0),
+              ),
+              subtitle: Text(
+                'Status: ${club.busyStatus}/10\nCity: ${club.city}',
+                style: TextStyle(fontSize: 16.0),
+              ),
+              leading: Icon(
+                Icons.circle,
+                color: getStatusColor(club.busyStatus),
+              ),
+              onTap: () => _showEditStatusDialog(context, club),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditStatusDialog(BuildContext context, Club club) {
+    final _statusController = TextEditingController(text: club.busyStatus.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Busy Status for ${club.name}'),
+          content: TextField(
+            controller: _statusController,
+            decoration: InputDecoration(labelText: 'Busy Status (1-10)'),
+            keyboardType: TextInputType.number,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final status = int.tryParse(_statusController.text);
+
+                if (status != null && status >= 1 && status <= 10) {
+                  final querySnapshot = await FirebaseFirestore.instance
+                      .collection('clubs')
+                      .where('name', isEqualTo: club.name)
+                      .get();
+
+                  if (querySnapshot.docs.isNotEmpty) {
+                    final docId = querySnapshot.docs.first.id;
+                    await FirebaseFirestore.instance.collection('clubs').doc(docId).update({
+                      'busyStatus': status,
+                    });
+                  }
+
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Color getStatusColor(int status) {
+    if (status >= 8) {
+      return Colors.red;
+    } else if (status >= 4) {
+      return Colors.orange;
+    } else {
+      return Colors.green;
+    }
   }
 }
